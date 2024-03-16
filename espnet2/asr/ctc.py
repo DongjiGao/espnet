@@ -30,12 +30,13 @@ class CTC(torch.nn.Module):
         brctc_risk_strategy: str = "exp",
         brctc_group_strategy: str = "end",
         brctc_risk_factor: float = 0.0,
+        allow_bypass: bool = False,
+        allow_self_loop: bool = False,
     ):
         assert check_argument_types()
         super().__init__()
         eprojs = encoder_output_size
         self.dropout_rate = dropout_rate
-        self.ctc_lo = torch.nn.Linear(eprojs, odim)
         self.ctc_type = ctc_type
         if ignore_nan_grad is not None:
             zero_infinity = ignore_nan_grad
@@ -65,19 +66,31 @@ class CTC(torch.nn.Module):
             self.ctc_loss = BayesRiskCTC(
                 brctc_risk_strategy, brctc_group_strategy, brctc_risk_factor
             )
-        
+
         elif self.ctc_type == "otc":
             try:
                 import k2
             except ImportError:
                 raise ImportError("You should install K2 to use OTC")
-                from espnet2.asr.otc import OTC
+            
+            from espnet2.asr.otc import OTC
 
-                self.ctc_loss = OTC()
+            # remove OTC token from neural netword output 
+            # as it is the average of all non-blank tokens
+            odim = odim - 1
+
+            self.ctc_loss = OTC(
+                otc_token_id=odim,
+                allow_bypass=allow_bypass,
+                allow_self_loop=allow_self_loop,
+            )
 
         else:
-            raise ValueError(f'ctc_type must be "builtin" or "gtnctc": {self.ctc_type}')
+            raise ValueError(
+                f'ctc_type must be "builtin" or "gtnctc" or "otc": {self.ctc_type}'
+            )
 
+        self.ctc_lo = torch.nn.Linear(eprojs, odim)
         self.reduce = reduce
 
     def loss_fn(self, th_pred, th_target, th_ilen, th_olen) -> torch.Tensor:
@@ -154,6 +167,9 @@ class CTC(torch.nn.Module):
         elif self.ctc_type == "gtnctc":
             log_probs = torch.nn.functional.log_softmax(th_pred, dim=2)
             return self.ctc_loss(log_probs, th_target, th_ilen, 0, "none")
+        elif self.ctc_type == "otc": 
+            log_probs = torch.nn.functional.log_softmax(th_pred, dim=2)  
+            return self.ctc_loss(log_probs, th_target, th_ilen, th_olen)
 
         else:
             raise NotImplementedError
@@ -170,14 +186,14 @@ class CTC(torch.nn.Module):
         # hs_pad: (B, L, NProj) -> ys_hat: (B, L, Nvocab)
         ys_hat = self.ctc_lo(F.dropout(hs_pad, p=self.dropout_rate))
 
-        if self.ctc_type == "brctc":
+        if self.ctc_type == "brctc" or self.ctc_type == "otc":
             loss = self.loss_fn(ys_hat, ys_pad, hlens, ys_lens).to(
                 device=hs_pad.device, dtype=hs_pad.dtype
             )
             return loss
 
         elif self.ctc_type == "gtnctc":
-            # gtn expects list form for ys
+            # gtn/k2 expects list form for ys
             ys_true = [y[y != -1] for y in ys_pad]  # parse padded ys
         else:
             # ys_hat: (B, L, D) -> (L, B, D)

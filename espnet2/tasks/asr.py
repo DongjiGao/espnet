@@ -519,6 +519,14 @@ class ASRTask(AbsTask):
                     token_list.insert(blank_idx, f"<blank{dur}>")
             args.token_list = token_list
 
+        # If use OTC crierion,
+        # <star> symbol is added to the end of token_list
+        if args.ctc_conf.get("ctc_type", None) == "otc":
+            otc_token = "<star>"
+            if otc_token not in token_list:
+                token_list.append(otc_token)
+            args.token_list = token_list
+
         vocab_size = len(token_list)
         logging.info(f"Vocabulary size: {vocab_size }")
 
