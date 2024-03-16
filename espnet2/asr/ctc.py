@@ -12,7 +12,7 @@ class CTC(torch.nn.Module):
         odim: dimension of outputs
         encoder_output_size: number of encoder projection units
         dropout_rate: dropout rate (0.0 ~ 1.0)
-        ctc_type: builtin or gtnctc
+        ctc_type: builtin or gtnctc or otc
         reduce: reduce the CTC loss into a scalar
         ignore_nan_grad: Same as zero_infinity (keeping for backward compatiblity)
         zero_infinity:  Whether to zero infinite losses and the associated gradients.
@@ -65,6 +65,15 @@ class CTC(torch.nn.Module):
             self.ctc_loss = BayesRiskCTC(
                 brctc_risk_strategy, brctc_group_strategy, brctc_risk_factor
             )
+        
+        elif self.ctc_type == "otc":
+            try:
+                import k2
+            except ImportError:
+                raise ImportError("You should install K2 to use OTC")
+                from espnet2.asr.otc import OTC
+
+                self.ctc_loss = OTC()
 
         else:
             raise ValueError(f'ctc_type must be "builtin" or "gtnctc": {self.ctc_type}')
