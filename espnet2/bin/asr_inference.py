@@ -161,7 +161,12 @@ class Speech2Text:
         decoder = asr_model.decoder
 
         ctc = CTCPrefixScorer(ctc=asr_model.ctc, eos=asr_model.eos)
-        token_list = asr_model.token_list
+        if getattr(asr_model.ctc, 'ctc_type') == 'otc':
+            # remove '<star>' token from decoding
+            token_list = asr_model.token_list[:-1]
+            logging.info("Set token list to not include <star> token for decoding if ctc_type is otc")
+        else:
+            token_list = asr_model.token_list
         scorers.update(
             decoder=decoder,
             ctc=ctc,
