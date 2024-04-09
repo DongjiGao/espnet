@@ -11,11 +11,19 @@ import torch
 
 
 class OTC(torch.nn.Module):
-    def __init__(self, otc_token_id, allow_bypass=False, allow_self_loop=False):
+    def __init__(self, otc_token_id, allow_bypass=False, allow_self_loop=False,
+                 initial_bypass_weight=0.0, bypass_weight_decay=0.0,
+                 initial_self_loop_weight=0.0, self_loop_weight_decay=0.0):
         super().__init__()
         self.otc_token_id = otc_token_id
         self.allow_bypass = allow_bypass
         self.allow_self_loop = allow_self_loop
+        self.initial_bypass_weight = initial_bypass_weight
+        self.bypass_weight_decay = bypass_weight_decay
+        self.initial_self_loop_weight = initial_self_loop_weight
+        self.self_loop_weight_decay = self_loop_weight_decay
+        self.bypass_weight = None
+        self.self_loop_weight = None
 
     def forward(
         self,
@@ -33,6 +41,12 @@ class OTC(torch.nn.Module):
             allow_bypass = self.allow_bypass
         if allow_self_loop is None:
             allow_self_loop = self.allow_self_loop
+        if allow_bypass and bypass_weight == 0.0:
+            bypass_weight = self.bypass_weight
+            assert(bypass_weight is not None), "bypass_weight should not be None"
+        if allow_self_loop and self_loop_weight == 0.0:
+            self_loop_weight = self.self_loop_weight
+            assert(self_loop_weight is not None), "self_loop_weight should not be None"
 
         # Reorder and filter out invalid examples:
         # A. K2 requires that hlens are in descending order;

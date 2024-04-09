@@ -32,6 +32,10 @@ class CTC(torch.nn.Module):
         brctc_risk_factor: float = 0.0,
         allow_bypass: bool = False,
         allow_self_loop: bool = False,
+        initial_bypass_weight: float = 0.0,
+        bypass_weight_decay: float = 0.0,
+        initial_self_loop_weight: float = 0.0,
+        self_loop_weight_decay: float = 0.0
     ):
         assert check_argument_types()
         super().__init__()
@@ -83,6 +87,10 @@ class CTC(torch.nn.Module):
                 otc_token_id=odim,
                 allow_bypass=allow_bypass,
                 allow_self_loop=allow_self_loop,
+                initial_bypass_weight=initial_bypass_weight,
+                bypass_weight_decay=bypass_weight_decay,
+                initial_self_loop_weight=initial_self_loop_weight,
+                self_loop_weight_decay=self_loop_weight_decay
             )
 
         else:

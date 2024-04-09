@@ -312,6 +312,22 @@ class Trainer:
             set_all_random_seed(trainer_options.seed + iepoch)
 
             reporter.set_epoch(iepoch)
+
+            # for otc, kinda hacky
+            if dp_model.module.ctc.ctc_type == "otc":
+                model_otc = dp_model.module.ctc.ctc_loss
+                logging.info(f"Epoch {iepoch}: otc attributes {model_otc.initial_self_loop_weight}, {model_otc.initial_bypass_weight}")
+                if model_otc.allow_self_loop:
+                    model_otc.self_loop_weight = model_otc.initial_self_loop_weight * (
+                        model_otc.self_loop_weight_decay ** (iepoch - 1)
+                    )
+                    logging.info(f"Epoch {iepoch}: setting otc self-loop weight to {model_otc.self_loop_weight}. ")
+                if model_otc.allow_bypass:
+                    model_otc.bypass_weight = model_otc.initial_bypass_weight * (
+                        model_otc.bypass_weight_decay ** (iepoch - 1)
+                    )
+                    logging.info(f"Epoch {iepoch}: setting otc bypass weight to {model_otc.bypass_weight}. ")
+
             # 1. Train and validation for one-epoch
             with reporter.observe("train") as sub_reporter:
                 all_steps_are_invalid = cls.train_one_epoch(
