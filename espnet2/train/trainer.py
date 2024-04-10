@@ -315,18 +315,13 @@ class Trainer:
 
             # for otc, kinda hacky
             if dp_model.module.ctc.ctc_type == "otc":
-                model_otc = dp_model.module.ctc.ctc_loss
-                logging.info(f"Epoch {iepoch}: otc attributes {model_otc.initial_self_loop_weight}, {model_otc.initial_bypass_weight}")
-                if model_otc.allow_self_loop:
-                    model_otc.self_loop_weight = model_otc.initial_self_loop_weight * (
-                        model_otc.self_loop_weight_decay ** (iepoch - 1)
-                    )
-                    logging.info(f"Epoch {iepoch}: setting otc self-loop weight to {model_otc.self_loop_weight}. ")
-                if model_otc.allow_bypass:
-                    model_otc.bypass_weight = model_otc.initial_bypass_weight * (
-                        model_otc.bypass_weight_decay ** (iepoch - 1)
-                    )
-                    logging.info(f"Epoch {iepoch}: setting otc bypass weight to {model_otc.bypass_weight}. ")
+                dp_model.module.ctc.ctc_loss.set_epoch(iepoch)
+                self_loop_weight = dp_model.module.ctc.ctc_loss.current_self_loop_arc_weight()
+                bypass_weight = dp_model.module.ctc.ctc_loss.current_bypass_arc_weight()
+                if self_loop_weight is not None:
+                    logging.info(f"Epoch {iepoch}: self_loop_weight = {self_loop_weight}")
+                if bypass_weight is not None:
+                    logging.info(f"Epoch {iepoch}: bypass_weight = {bypass_weight}")
 
             # 1. Train and validation for one-epoch
             with reporter.observe("train") as sub_reporter:

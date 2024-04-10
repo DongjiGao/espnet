@@ -22,8 +22,21 @@ class OTC(torch.nn.Module):
         self.bypass_weight_decay = bypass_weight_decay
         self.initial_self_loop_weight = initial_self_loop_weight
         self.self_loop_weight_decay = self_loop_weight_decay
-        self.bypass_weight = None
-        self.self_loop_weight = None
+        self.__iepoch = None # to be set externally
+
+    def set_epoch(self, iepoch):
+        self.__iepoch = iepoch
+        return
+
+    def current_bypass_arc_weight(self):
+        if not self.allow_bypass:
+            return None
+        return self.initial_bypass_weight * (self.bypass_weight_decay ** (self.__iepoch - 1))
+
+    def current_self_loop_arc_weight(self):
+        if not self.allow_self_loop:
+            return None
+        return self.initial_self_loop_weight * (self.self_loop_weight_decay ** (self.__iepoch - 1))
 
     def forward(
         self,
@@ -33,20 +46,18 @@ class OTC(torch.nn.Module):
         ylens,
         allow_bypass=None,
         allow_self_loop=None,
-        bypass_weight=0.0,
-        self_loop_weight=0.0,
+        bypass_weight=None,
+        self_loop_weight=None,
     ):
         self.device = nnet_output.device
         if allow_bypass is None:
             allow_bypass = self.allow_bypass
         if allow_self_loop is None:
             allow_self_loop = self.allow_self_loop
-        if allow_bypass and bypass_weight == 0.0:
-            bypass_weight = self.bypass_weight
-            assert(bypass_weight is not None), "bypass_weight should not be None"
-        if allow_self_loop and self_loop_weight == 0.0:
-            self_loop_weight = self.self_loop_weight
-            assert(self_loop_weight is not None), "self_loop_weight should not be None"
+        if allow_bypass and bypass_weight is None:
+            bypass_weight = self.current_bypass_arc_weight()
+        if allow_self_loop and self_loop_weight is None:
+            self_loop_weight = self.current_self_loop_arc_weight()
 
         # Reorder and filter out invalid examples:
         # A. K2 requires that hlens are in descending order;
